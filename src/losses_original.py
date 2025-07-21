@@ -3,24 +3,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class STEM4D_PoissonLoss(nn.Module):
-    """Poisson negative log-likelihood loss из статьи"""
+    """Poisson negative log-likelihood loss"""
     def __init__(self):
         super().__init__()
         
     def forward(self, predicted, target):
-        # Избегаем log(0)
+        # Avoid log(0)
         eps = 1e-8
         predicted = torch.clamp(predicted, min=eps)
         
         # Poisson NLL: target * log(predicted) - predicted - log(target!)
-        # Последний член константа, не влияет на градиент
+        # The last term is a constant and does not affect the gradient.
         loss = -torch.sum(target * torch.log(predicted) - predicted)
         
         return loss / predicted.numel()
 
 
 class CombinedLoss(nn.Module):
-    """Combined loss из статьи: Poisson + PACBED + STEM regularization"""
+    """Combined loss: Poisson + PACBED + STEM regularization"""
     def __init__(self, warmup_epochs=8, pacbed_weight=0.02, stem_weight=0.01):
         super().__init__()
         self.warmup_epochs = warmup_epochs
@@ -32,7 +32,7 @@ class CombinedLoss(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.poisson_loss = STEM4D_PoissonLoss()
         
-        # Будут установлены позже
+        
         self.target_pacbed = None
         self.target_stem_sums = None
     
@@ -40,14 +40,14 @@ class CombinedLoss(nn.Module):
         self.current_epoch = epoch
     
     def set_targets(self, target_pacbed, target_stem_sums):
-        """Установить целевые PACBED и STEM суммы"""
+        
         self.target_pacbed = target_pacbed
         self.target_stem_sums = target_stem_sums
         
     def forward(self, predicted, target, indices=None):
         batch_size = predicted.shape[0]
         
-        # Основная loss (MSE или Poisson)
+        # Main loss (MSE or Poisson)
         if self.current_epoch < self.warmup_epochs:
             main_loss = self.mse_loss(predicted, target)
         else:
@@ -66,7 +66,7 @@ class CombinedLoss(nn.Module):
             target_sums = torch.stack([self.target_stem_sums[idx] for idx in indices])
             stem_loss = F.mse_loss(pred_stem_sums, target_sums)
         
-        # Комбинированная loss с весами из статьи
+        # Combined loss with weights
         total_loss = (self.poisson_weight * main_loss + 
                      self.pacbed_weight * pacbed_loss + 
                      self.stem_weight * stem_loss)

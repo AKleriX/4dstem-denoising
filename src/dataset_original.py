@@ -1,18 +1,18 @@
-# Файл: src/dataset_original.py
+
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
 class STEM4DDataset(Dataset):
-    """Dataset для деноизинга 4D STEM с использованием соседних паттернов"""
+    
     
     def __init__(self, noisy_data, window_size=3, bright_field_mask=None):
         """
         Args:
             noisy_data: 4D numpy array [scan_x, scan_y, det_x, det_y]
-            window_size: размер окна соседних паттернов (3 для 3x3)
-            bright_field_mask: маска bright field области
+            window_size: size of neighbouring patterns (3 for 3x3)
+            bright_field_mask: mask bright field area
         """
         self.data = noisy_data.astype(np.float32)
         self.scan_x, self.scan_y, self.det_x, self.det_y = self.data.shape
@@ -20,7 +20,7 @@ class STEM4DDataset(Dataset):
         self.offset = window_size // 2
         self.bf_mask = bright_field_mask
         
-        # Создаем список валидных позиций (исключая края)
+        # Create a list of valid positions (excluding the edges)
         self.valid_positions = []
         for x in range(self.offset, self.scan_x - self.offset):
             for y in range(self.offset, self.scan_y - self.offset):
@@ -32,11 +32,11 @@ class STEM4DDataset(Dataset):
     def __getitem__(self, idx):
         x, y = self.valid_positions[idx]
         
-        # Собираем соседние паттерны (8 соседей для 3x3)
+        # Collect neighbouring patterns (8 neighbours for 3x3)
         neighbors = []
         for i in range(self.window_size):
             for j in range(self.window_size):
-                # Пропускаем центральный паттерн
+                # Skip the central pattern
                 if i == self.offset and j == self.offset:
                     continue
                 
@@ -44,16 +44,16 @@ class STEM4DDataset(Dataset):
                 ny = y - self.offset + j
                 pattern = self.data[nx, ny]
                 
-                # Применяем маску bright field если есть
+                # Apply the bright field mask if available
                 if self.bf_mask is not None:
                     pattern = pattern * self.bf_mask
                 
                 neighbors.append(pattern)
         
-        # Stack соседей как каналы входа
+        # Neighbour stack as input channels
         input_tensor = torch.FloatTensor(np.stack(neighbors))
         
-        # Целевой паттерн
+        # Target pattern
         target = self.data[x, y]
         if self.bf_mask is not None:
             target = target * self.bf_mask

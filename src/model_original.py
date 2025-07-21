@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class conv_block(nn.Module):
-    """Конволюционный блок из двух слоев Conv + BatchNorm + ReLU"""
+    """Convolution block consisting of two layers Conv + BatchNorm + ReLU"""
     def __init__(self, ch_in, ch_out):
         super(conv_block, self).__init__()
         self.conv = nn.Sequential(
@@ -20,7 +20,7 @@ class conv_block(nn.Module):
 
 
 class up_conv(nn.Module):
-    """Upsampling через ConvTranspose2d"""
+    """Upsampling from ConvTranspose2d"""
     def __init__(self, ch_in, ch_out):
         super(up_conv, self).__init__()
         self.up = nn.Sequential(
@@ -36,7 +36,7 @@ class up_conv(nn.Module):
 
 
 class U_Net(nn.Module):
-    """Оригинальная U-Net архитектура из репозитория mcemtools"""
+    """Original U-Net architecture from the mcemtools repository"""
     def __init__(self, img_ch=8, output_ch=1, n_kernels=64, mask=None):
         super(U_Net, self).__init__()
         
@@ -64,23 +64,23 @@ class U_Net(nn.Module):
 
         self.Conv_1x1 = nn.Conv2d(n_kernels, output_ch, kernel_size=1, stride=1, padding=0)
 
-        # Параметры для нормализации как в оригинале
-        self.mask = mask
-        self.mu_exact = None  # Точные значения STEM
-        self.mu = None       # Коэффициент коррекции STEM
-        self.PACBED = None   # Коэффициент коррекции PACBED
         
-        # ВАЖНО: мультипликативная константа (не обучаемая)
+        self.mask = mask
+        self.mu_exact = None  
+        self.mu = None       
+        self.PACBED = None   
+        
+        
         self.register_buffer('scale_factor', torch.ones(1))
         
-        # Инициализация весов последнего слоя близко к нулю для стабильности
+        
         with torch.no_grad():
             self.Conv_1x1.weight.data.normal_(0.0, 0.01)
             if self.Conv_1x1.bias is not None:
                 self.Conv_1x1.bias.data.zero_()
     
     def reset(self):
-        """Сброс параметров сети"""
+        
         for layer in self.children():
             if hasattr(layer, 'reset_parameters'):
                 layer.reset_parameters()
@@ -105,7 +105,7 @@ class U_Net(nn.Module):
         x5 = self.Maxpool(x4)
         x5 = self.Conv5(x5)
 
-        # Decoder path с skip connections
+        # Decoder path with skip connections
         d5 = self.Up5(x5)
         d5 = torch.cat((x4, d5), dim=1)
         d5 = self.Up_conv5(d5)
@@ -124,13 +124,13 @@ class U_Net(nn.Module):
 
         d1 = self.Conv_1x1(d2)
 
-        # Применяем масштабирующий фактор (не обучаемый)
+        
         d1 = d1 * self.scale_factor
         
-        # ВАЖНО: возведение в квадрат для гарантии положительных значений
+        
         d1 = d1 ** 2
         
-        # Применение коррекций как в оригинале
+        # Application of corrections as in the original
         for dim in range(d1.shape[0]):
             if self.PACBED is not None:
                 d1[dim] *= self.PACBED
